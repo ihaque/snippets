@@ -1,0 +1,109 @@
+<html>
+<head><title>Interactive Preference Ranking</title>
+<script>
+function make_search_key(x, y) {
+    return (x + '___' + y);
+}
+
+function comparator (x, y) {
+      // Uses global document.cmphash to memoize comparisons
+      var key = make_search_key(x, y);
+      var key_rev = make_search_key(y, x);
+      if (!document.cmphash.hasOwnProperty(key)) {
+        var choice = window.prompt("1 if '"+x+"' is greater than '"+y+"', cancel if equal, 0 otherwise.");
+        if (choice === null) {
+            document.cmphash[key] = 0
+        } else {
+            document.cmphash[key] = (parseInt(choice) === 0) ? -1 : 1;
+        }
+        document.cmphash[key_rev] = -document.cmphash[key];
+      }
+      return document.cmphash[key];
+};
+
+function find_equal_indices(lst, idx) {
+    // Make repeated passes through lst to propagate pairwise equality
+    // We may not have compared all pairs of elements, so there may be elements
+    // that are transitively equal but are not annotated as such in the comparison hash.
+    var equal_indices = new Set([idx]);
+    var last_length = 0;
+
+    // Use these to skip elements that are definitely less than or greater than the set we care about
+    var base = -1;
+    var bound = lst.length
+    while (equal_indices.size != last_length) {
+        // If we grew at least one element, pass again to see if there are others
+        last_length = equal_indices.size;
+        for (var i = base + 1; i < bound; i++) {
+            var any_equal = false;
+            var any_less = false;
+            var any_greater = false;
+            if (equal_indices.has(i)) continue;
+            for (let j of equal_indices) {
+                if (i == j) continue;
+                var key = make_search_key(lst[i], lst[j]);
+                if (document.cmphash.hasOwnProperty(key)) {
+                    var comparison = document.cmphash[key];
+                    console.log('comparison ' + lst[i] + ' ' + lst[j] + ' ' + comparison);
+                    if (comparison == -1) any_less = true;
+                    else if (comparison == 0) any_equal = true;
+                    else any_greater = true;
+                    break;
+                }
+            }
+            if (any_less) base = Math.max(base, i);
+            if (any_greater) bound = i;
+            if (any_equal) equal_indices.add(i);
+        }
+    }
+    return equal_indices;
+}
+
+function sort_items() {
+    var lst = document.getElementById('input_ta').value.split('\n');
+    document.cmphash = Object();
+
+    lst.sort(comparator);
+    var out = document.getElementById('sorted_list');
+    // Remove existing list items
+    while (out.firstChild) {
+        out.removeChild(out.firstChild);
+    }
+    var i = 0;
+    console.log(lst);
+    while (i < lst.length) {
+        var equal_set = find_equal_indices(lst, i);
+        console.log(i);
+        console.log(equal_set);
+        var li = document.createElement('li');
+        if (equal_set.size == 1) {
+            li.innerHTML = "<b>" + lst[i] + "</b>";
+        } else {
+            var ul = document.createElement('ul');
+            for (let j of equal_set) {
+                var uli = document.createElement('li');
+                uli.innerHTML = "<b>" + lst[j] + "</b>";
+                ul.appendChild(uli);
+            }
+            li.appendChild(ul);
+        }
+        out.appendChild(li);
+        i = Math.max(...equal_set) + 1;
+    }
+}
+</script>
+</head>
+<body>
+Enter the items you'd like to sort, one per line, in the text box below.<br/>
+
+<textarea id="input_ta" rows="8" cols="40">
+Pizza
+Hamburgers
+Burritos
+Chow Mein
+Chicken Tikka Masala</textarea>
+<button onclick="sort_items()">Sort items</button>
+<br/>
+<ol id="sorted_list"></ol>
+</body>
+</html>
